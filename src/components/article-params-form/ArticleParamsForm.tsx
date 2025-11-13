@@ -2,7 +2,7 @@ import { ArrowButton } from 'src/ui/arrow-button';
 import { Button } from 'src/ui/button';
 import { Text } from 'src/ui/text';
 import { Select } from 'src/ui/select';
-import { SyntheticEvent, useState } from 'react';
+import { SyntheticEvent, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 
 import styles from './ArticleParamsForm.module.scss';
@@ -20,74 +20,73 @@ import { RadioGroup } from 'src/ui/radio-group';
 import { Separator } from 'src/ui/separator';
 
 type ArticleParamsFormProps = {
-	state: ArticleStateType;
-	onSubmit?: (newState: ArticleStateType) => void;
-	onReset?: () => void;
+	currentArticleState: ArticleStateType;
+	setCurrentArticleState: (newCurrentArticleState: ArticleStateType) => void;
 };
 
-type ArticleParamsState = {
-	isOpen: boolean;
-} & ArticleStateType;
-
 export const ArticleParamsForm = (props: ArticleParamsFormProps) => {
-	const [state, setState] = useState<ArticleParamsState>({
-		...props.state,
-		isOpen: false,
-	});
+	const [formVisible, setFormVisible] = useState<boolean>(false);
+	const [editedArticleState, setEditedArticleState] =
+		useState<ArticleStateType>({
+			...props.currentArticleState,
+		});
+
+	const popupRef = useRef<HTMLElement>(null);
+
+	useEffect(() => {
+		if (!formVisible) return;
+
+		const handleEscape = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				setFormVisible(false);
+			}
+		};
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (popupRef.current && !popupRef.current.contains(target)) {
+				setFormVisible(false);
+			}
+		};
+
+		document.addEventListener('keydown', handleEscape);
+		document.addEventListener('mousedown', handleClickOutside);
+
+		return () => {
+			document.removeEventListener('keydown', handleEscape);
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [formVisible]);
 
 	const onArrowClick = () => {
-		setState((oldState) => {
-			return { ...oldState, isOpen: !oldState.isOpen };
-		});
+		setFormVisible(!formVisible);
 	};
 
-	const onFontFamilySelected = (newFamily: OptionType) =>
-		setState((oldState) => {
-			return { ...oldState, fontFamilyOption: newFamily };
-		});
-
-	const onFontSizeSelected = (newSize: OptionType) =>
-		setState((oldState) => {
-			return { ...oldState, fontSizeOption: newSize };
-		});
-
-	const onFontColorSelected = (newColor: OptionType) =>
-		setState((oldState) => {
-			return { ...oldState, fontColor: newColor };
-		});
-
-	const onBackgroundColorSelected = (newColor: OptionType) =>
-		setState((oldState) => {
-			return { ...oldState, backgroundColor: newColor };
-		});
-
-	const onContentWidthSelected = (newWidth: OptionType) =>
-		setState((oldState) => {
-			return { ...oldState, contentWidth: newWidth };
-		});
+	const updateFormField = (field: keyof ArticleStateType) => {
+		return (value: OptionType) => {
+			setEditedArticleState({ ...editedArticleState, [field]: value });
+		};
+	};
 
 	const onSubmit = (e: SyntheticEvent) => {
 		e.preventDefault();
-		setState({ ...state, isOpen: false });
-		if (props.onSubmit) {
-			props.onSubmit({ ...state });
-		}
+		setFormVisible(false);
+		props.setCurrentArticleState(editedArticleState);
 	};
 
 	const onReset = () => {
-		setState({ ...defaultArticleState, isOpen: false });
-		if (props.onReset) {
-			props.onReset();
-		}
+		setFormVisible(false);
+		setEditedArticleState(defaultArticleState);
+		props.setCurrentArticleState(defaultArticleState);
 	};
 
 	return (
 		<>
-			<ArrowButton isOpen={state.isOpen} onClick={onArrowClick} />
-
+			<ArrowButton isOpen={formVisible} onClick={onArrowClick} />
 			<aside
+				ref={popupRef}
 				className={clsx(styles.container, {
-					[styles.container_open]: state.isOpen,
+					[styles.container_open]: formVisible,
 				})}>
 				<form className={styles.form} onSubmit={onSubmit} onReset={onReset}>
 					<Text as={'h2'} uppercase weight={800} size={31}>
@@ -95,35 +94,35 @@ export const ArticleParamsForm = (props: ArticleParamsFormProps) => {
 					</Text>
 					<Select
 						options={fontFamilyOptions}
-						selected={state.fontFamilyOption}
+						selected={editedArticleState.fontFamilyOption}
 						title='Шрифт'
-						onChange={onFontFamilySelected}
+						onChange={updateFormField('fontFamilyOption')}
 					/>
 					<RadioGroup
 						options={fontSizeOptions}
-						selected={state.fontSizeOption}
+						selected={editedArticleState.fontSizeOption}
 						title='Размер шрифта'
 						name='fontsize'
-						onChange={onFontSizeSelected}
+						onChange={updateFormField('fontSizeOption')}
 					/>
 					<Select
 						options={fontColors}
-						selected={state.fontColor}
+						selected={editedArticleState.fontColor}
 						title='Цвет шрифта'
-						onChange={onFontColorSelected}
+						onChange={updateFormField('fontColor')}
 					/>
 					<Separator />
 					<Select
 						options={backgroundColors}
-						selected={state.backgroundColor}
+						selected={editedArticleState.backgroundColor}
 						title='Цвет фона'
-						onChange={onBackgroundColorSelected}
+						onChange={updateFormField('backgroundColor')}
 					/>
 					<Select
 						options={contentWidthArr}
-						selected={state.contentWidth}
+						selected={editedArticleState.contentWidth}
 						title='Ширина контента'
-						onChange={onContentWidthSelected}
+						onChange={updateFormField('contentWidth')}
 					/>
 					<div className={styles.bottomContainer}>
 						<Button title='Сбросить' htmlType='reset' type='clear' />
